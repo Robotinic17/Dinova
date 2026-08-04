@@ -271,6 +271,10 @@ const extractGroqOutput = (completion) => {
   return "";
 };
 
+app.get("/", (req, res) => {
+  res.json({ name: "DINOVA API", status: "running", timestamp: new Date().toISOString() });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
