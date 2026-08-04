@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: dinova-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false # set manually in Render dashboard
+      - key: ALLOWED_ORIGIN
+        value: https://dinova.vercel.app
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: NODE_ENV
+        value: production
