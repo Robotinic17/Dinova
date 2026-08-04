@@ -78,7 +78,13 @@ export default function Sidebar({
           borderColor: "var(--border)",
         }}
       >
-        <div className="flex h-full min-h-0 flex-col p-4">
+        <div
+          className="flex h-full min-h-0 flex-col p-4"
+          style={{
+            paddingTop: "max(1rem, env(safe-area-inset-top, 0px))",
+            paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+          }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div

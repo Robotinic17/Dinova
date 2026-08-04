@@ -1,15 +1,12 @@
 ﻿import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import https from "https";
-import { NodeHttpHandler } from "@smithy/node-http-handler";
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import Groq from "groq-sdk";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "amazon.nova-lite-v1:0";
-const REGION = process.env.AWS_REGION || "us-east-1";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 app.use(express.json({ limit: "2mb" }));
 
@@ -29,36 +26,19 @@ app.use(
       if (isAllowedOrigin(origin)) return callback(null, true);
       return callback(new Error("Not allowed by CORS"));
     },
-  })
+  }),
 );
 
-// Force HTTP/1.1 with explicit timeouts. This avoids intermittent HTTP/2 stream cancel errors
-// some Windows networks hit when calling AWS endpoints.
-const bedrock = new BedrockRuntimeClient({
-  region: REGION,
-  maxAttempts: 2,
-  requestHandler: new NodeHttpHandler({
-    connectionTimeout: 10_000,
-    requestTimeout: 90_000,
-    httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 50 }),
-  }),
-});
-
-const extractOutputText = (decoded) => {
-  const contentList = decoded?.output?.message?.content;
-  if (Array.isArray(contentList)) {
-    const textBlock = contentList.find((item) => item?.text);
-    if (textBlock?.text) return textBlock.text;
-  }
-  return decoded?.results?.[0]?.outputText || decoded?.completion || "";
-};
-
 const clampMode = (mode) => {
-  return ["email", "summary", "plan", "general"].includes(mode) ? mode : "general";
+  return ["email", "summary", "plan", "general"].includes(mode)
+    ? mode
+    : "general";
 };
 
 const clampTone = (tone) => {
-  return ["professional", "friendly", "urgent"].includes(tone) ? tone : "professional";
+  return ["professional", "friendly", "urgent"].includes(tone)
+    ? tone
+    : "professional";
 };
 
 const clampLength = (length) => {
@@ -120,7 +100,9 @@ const lengthToWordRange = (length) => {
 };
 
 const isGreeting = (text) => {
-  const t = String(text || "").trim().toLowerCase();
+  const t = String(text || "")
+    .trim()
+    .toLowerCase();
   if (!t) return false;
   // Keep it simple and robust for hackathon demos.
   return (
@@ -144,7 +126,8 @@ const cleanGeneralOutput = (output) => {
   let s = output.trim();
 
   // Strip common unwanted "label" headings the model sometimes adds.
-  const badFirstLine = /^(#+\s*)?(friendly greeting|greeting response|introduction|purpose|actionable items|conclusion)\s*$/i;
+  const badFirstLine =
+    /^(#+\s*)?(friendly greeting|greeting response|introduction|purpose|actionable items|conclusion)\s*$/i;
   const lines = s.split(/\r?\n/);
   if (lines.length >= 2 && badFirstLine.test(lines[0].trim())) {
     s = lines.slice(1).join("\n").trim();
@@ -152,7 +135,10 @@ const cleanGeneralOutput = (output) => {
 
   // Remove remaining obvious section headers anywhere in short small-talk outputs.
   s = s
-    .replace(/^\s*(#+\s*)?(friendly greeting|greeting response|introduction|purpose|actionable items|conclusion)\s*$/gim, "")
+    .replace(
+      /^\s*(#+\s*)?(friendly greeting|greeting response|introduction|purpose|actionable items|conclusion)\s*$/gim,
+      "",
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -260,7 +246,7 @@ const buildPrompt = ({ mode, input, tone, length }) => {
   ].join("\n");
 };
 
-const normalizeHistory = (history) => {
+const normalizeHistoryForGroq = (history) => {
   if (!Array.isArray(history)) return [];
   const cleaned = [];
   for (const item of history) {
@@ -268,10 +254,21 @@ const normalizeHistory = (history) => {
     if (item.role !== "user" && item.role !== "assistant") continue;
     const text = typeof item.content === "string" ? item.content : "";
     if (!text.trim()) continue;
-    cleaned.push({ role: item.role, content: [{ text }] });
+    cleaned.push({ role: item.role, content: text });
   }
-  // Keep the payload small.
   return cleaned.slice(-10);
+};
+
+const extractGroqOutput = (completion) => {
+  const content = completion?.choices?.[0]?.message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (typeof part === "string" ? part : part?.text || ""))
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
 };
 
 app.get("/api/health", (req, res) => {
@@ -288,7 +285,9 @@ app.post("/api/generate", async (req, res) => {
     }
 
     if (input.length > 10000) {
-      return res.status(400).json({ error: "Input is too long (max 10000 chars)." });
+      return res
+        .status(400)
+        .json({ error: "Input is too long (max 10000 chars)." });
     }
 
     const safeMode = clampMode(mode);
@@ -300,7 +299,7 @@ app.post("/api/generate", async (req, res) => {
         ? "You are a helpful assistant that writes concise, human-sounding professional outreach emails. Follow constraints exactly."
         : safeMode === "general"
           ? "You are DINOVA, a helpful chat assistant. Respond naturally. Do not add headings/titles unless the user requests structure."
-        : "You are DINOVA, a concise professional assistant. Return Markdown. Follow the requested structure exactly. Avoid filler.";
+          : "You are DINOVA, a concise professional assistant. Return Markdown. Follow the requested structure exactly. Avoid filler.";
 
     const prompt = buildPrompt({
       mode: safeMode,
@@ -309,47 +308,32 @@ app.post("/api/generate", async (req, res) => {
       length: safeLength,
     });
 
-    const msgs =
-      safeMode === "general"
-        ? [...normalizeHistory(history), { role: "user", content: [{ text: prompt }] }]
-        : [{ role: "user", content: [{ text: prompt }] }];
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const body = JSON.stringify({
-      schemaVersion: "messages-v1",
-      system: [{ text: systemText }],
-      messages: msgs,
-      inferenceConfig: {
-        maxTokens: lengthToMaxTokens(safeLength),
-        temperature: safeMode === "email" ? 0.4 : 0.2,
-        topP: 0.9,
-      },
+    const groqMessages = [
+      { role: "system", content: systemText },
+      ...(safeMode === "general" ? normalizeHistoryForGroq(history) : []),
+      { role: "user", content: prompt },
+    ];
+
+    const completion = await groq.chat.completions.create({
+      messages: groqMessages,
+      model: GROQ_MODEL,
+      temperature: safeMode === "email" ? 0.4 : 0.2,
+      max_tokens: lengthToMaxTokens(safeLength),
+      stream: false,
     });
 
-    const command = new InvokeModelCommand({
-      modelId: MODEL_ID,
-      contentType: "application/json",
-      accept: "application/json",
-      body,
-    });
-
-    const response = await bedrock.send(command);
-    const raw = response.body?.transformToString
-      ? await response.body.transformToString()
-      : new TextDecoder().decode(response.body);
-    const decoded = JSON.parse(raw);
-
-    let output = extractOutputText(decoded);
-    if (!output) {
-      if (process.env.NODE_ENV !== "production") {
-        output = JSON.stringify(decoded);
-      } else {
-        output = "The model returned an empty response.";
-      }
-    }
+    let output = extractGroqOutput(completion);
+    const modelUsed = GROQ_MODEL;
+    const providerUsed = "groq";
 
     // Defensive cleanup: remove obvious formatting artifacts if the model inserts them.
     if (safeMode === "email" && typeof output === "string") {
-      output = output.replace(/\n---\n/g, "\n\n").replace(/\n{3,}/g, "\n\n").trim();
+      output = output
+        .replace(/\n---\n/g, "\n\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
     }
     if (safeMode === "general") {
       output = cleanGeneralOutput(output);
@@ -359,15 +343,17 @@ app.post("/api/generate", async (req, res) => {
     return res.json({
       output,
       latency,
-      model: MODEL_ID,
+      model: modelUsed,
+      provider: providerUsed,
       settings: { mode: safeMode, tone: safeTone, length: safeLength },
     });
   } catch (err) {
-    console.error("Bedrock error:", err);
+    console.error("Groq error:", err);
 
     const isProd = process.env.NODE_ENV === "production";
     return res.status(500).json({
-      error: "Something went wrong while generating the response. Please try again.",
+      error:
+        "Something went wrong while generating the response. Please try again.",
       ...(isProd
         ? {}
         : {

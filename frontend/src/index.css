@@ -42,10 +42,32 @@ html.dark {
   color-scheme: dark;
 }
 
+/* Dynamic viewport height fallback: 100vh for browsers without dvh, 100dvh for modern ones */
+.h-dvh-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Force border-box on all elements for consistent sizing */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Sora", ui-sans-serif, system-ui;
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html,
@@ -121,6 +143,197 @@ html.dark .dinova-logo-light {
 
 .dinova-accent-bg {
   background: var(--accent);
+}
+
+.composer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--panel) 94%, transparent),
+    color-mix(in srgb, var(--panel-2) 88%, transparent)
+  );
+  border: 1.5px solid color-mix(in srgb, var(--border) 98%, transparent);
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(14px);
+  box-sizing: border-box;
+  max-width: 100%;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  box-shadow:
+    0 20px 38px rgba(0, 0, 0, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transform: translateY(-1px);
+}
+
+.length-dropdown {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.length-trigger,
+.theme-toggle-btn,
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.length-trigger {
+  gap: 0.45rem;
+  min-height: 2.9rem;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+.length-trigger:hover,
+.theme-toggle-btn:hover,
+.send-btn:hover {
+  transform: translateY(-1px);
+}
+
+.length-trigger:focus-visible,
+.theme-toggle-btn:focus-visible,
+.send-btn:focus-visible,
+.composer-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.length-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.6rem);
+  z-index: 20;
+  min-width: 10rem;
+  padding: 0.45rem;
+  margin: 0;
+  list-style: none;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 40px rgba(0, 0, 0, 0.16);
+}
+
+.length-option {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.length-option:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.length-option.selected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 2.9rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.4;
+  padding: 0 0.1rem;
+  outline: none;
+  box-shadow: none;
+}
+
+.composer-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 88%, transparent);
+}
+
+.composer-input:focus,
+.composer-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.theme-toggle-btn {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  color: var(--text);
+  flex: 0 0 auto;
+}
+
+.send-btn {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  flex: 0 0 auto;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.send-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+  transform: none;
+}
+
+.send-btn:disabled:hover {
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .composer {
+    gap: 0.5rem;
+    padding: 0.7rem 1rem;
+    border-radius: 2rem;
+  }
+
+  .theme-toggle-btn,
+  .send-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+  }
+
+  .composer-input {
+    height: 2.5rem;
+    font-size: 1rem; /* ≥16px prevents iOS Safari auto-zoom on focus */
+  }
 }
 
 @keyframes dinovaFadeIn {
@@ -202,8 +415,9 @@ html.dark .dinova-logo-light {
 }
 
 .dinova-md code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   font-size: 0.92em;
   padding: 0.15em 0.35em;
   border: 1px solid var(--border);
@@ -250,4 +464,13 @@ html.dark .dinova-logo-light {
   padding: 0.2em 0 0.2em 0.9em;
   border-left: 3px solid var(--border);
   color: var(--muted);
+}
+
+/* Mobile: prevent double-tap zoom on interactive elements */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
 }

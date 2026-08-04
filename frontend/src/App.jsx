@@ -2,6 +2,7 @@
 import axios from "axios";
 import { jsPDF } from "jspdf";
 import { PanelLeft } from "lucide-react";
+import toast from "react-hot-toast";
 import Sidebar from "./components/Sidebar.jsx";
 import MessageList from "./components/MessageList.jsx";
 import ChatInput from "./components/ChatInput.jsx";
@@ -14,7 +15,8 @@ const STORAGE_KEY_OLD = "dinova_chats_v2";
 const UI_KEY = "dinova_ui_v1";
 
 const uid = () => {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID)
+    return crypto.randomUUID();
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 };
 
@@ -37,7 +39,11 @@ const deriveTitle = (messages) => {
   return t.length > 32 ? `${t.slice(0, 32)}...` : t;
 };
 
-const INITIAL_CHAT = defaultChat({ mode: "general", length: "medium", tone: "professional" });
+const INITIAL_CHAT = defaultChat({
+  mode: "general",
+  length: "medium",
+  tone: "professional",
+});
 
 const hasMeaningfulMessages = (chat) => {
   const msgs = Array.isArray(chat?.messages) ? chat.messages : [];
@@ -66,8 +72,10 @@ export default function App() {
 
   const [composer, setComposer] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, chatId: null });
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    chatId: null,
+  });
   const [storageWarning, setStorageWarning] = useState("");
 
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
@@ -75,10 +83,13 @@ export default function App() {
 
   const activeChat = useMemo(
     () => chats.find((c) => c.id === activeChatId) || chats[0],
-    [chats, activeChatId]
+    [chats, activeChatId],
   );
 
-  const canSend = useMemo(() => composer.trim().length > 0 && !loading, [composer, loading]);
+  const canSend = useMemo(
+    () => composer.trim().length > 0 && !loading,
+    [composer, loading],
+  );
 
   useEffect(() => {
     let loadedChats = null;
@@ -87,7 +98,11 @@ export default function App() {
       const raw = rawChats || localStorage.getItem(STORAGE_KEY_OLD);
       if (raw) {
         const decoded = JSON.parse(raw);
-        const arr = Array.isArray(decoded) ? decoded : Array.isArray(decoded?.chats) ? decoded.chats : null;
+        const arr = Array.isArray(decoded)
+          ? decoded
+          : Array.isArray(decoded?.chats)
+            ? decoded.chats
+            : null;
         if (Array.isArray(arr) && arr.length) {
           loadedChats = arr.map((c) => ({
             ...c,
@@ -99,7 +114,9 @@ export default function App() {
             messages: Array.isArray(c?.messages) ? c.messages : [],
           }));
           setChats(loadedChats);
-          setActiveChatId((curr) => (loadedChats.some((c) => c.id === curr) ? curr : loadedChats[0].id));
+          setActiveChatId((curr) =>
+            loadedChats.some((c) => c.id === curr) ? curr : loadedChats[0].id,
+          );
         }
       }
 
@@ -111,7 +128,9 @@ export default function App() {
         if (ui?.tone) setTone(ui.tone);
         if (ui?.voicePref) setVoicePref(ui.voicePref);
         if (ui?.activeChatId) {
-          const ok = loadedChats ? loadedChats.some((c) => c.id === ui.activeChatId) : true;
+          const ok = loadedChats
+            ? loadedChats.some((c) => c.id === ui.activeChatId)
+            : true;
           if (ok) setActiveChatId(ui.activeChatId);
         }
       }
@@ -164,7 +183,7 @@ export default function App() {
     try {
       localStorage.setItem(
         UI_KEY,
-        JSON.stringify({ mode, length, tone, voicePref, activeChatId })
+        JSON.stringify({ mode, length, tone, voicePref, activeChatId }),
       );
     } catch {
       // ignore
@@ -186,7 +205,9 @@ export default function App() {
   // If the active chat was empty and got removed, fall back to the first remaining chat.
   useEffect(() => {
     if (!hydrated) return;
-    setActiveChatId((curr) => (chats.some((c) => c.id === curr) ? curr : chats[0]?.id));
+    setActiveChatId((curr) =>
+      chats.some((c) => c.id === curr) ? curr : chats[0]?.id,
+    );
   }, [hydrated, chats]);
 
   // Keep per-chat settings in sync with the sidebar controls so each chat "remembers" its tool config.
@@ -196,9 +217,14 @@ export default function App() {
         if (c.id !== activeChatId) return c;
         const curr = c.settings || {};
         const next = { mode, length, tone };
-        if (curr.mode === next.mode && curr.length === next.length && curr.tone === next.tone) return c;
+        if (
+          curr.mode === next.mode &&
+          curr.length === next.length &&
+          curr.tone === next.tone
+        )
+          return c;
         return { ...c, settings: next };
-      })
+      }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, length, tone, activeChatId]);
@@ -221,9 +247,16 @@ export default function App() {
 
   const buildHistory = () => {
     const msgs = (activeChat?.messages || [])
-      .filter((m) => (m.role === "user" || m.role === "assistant") && !m.meta?.thinking && !m.meta?.isError)
+      .filter(
+        (m) =>
+          (m.role === "user" || m.role === "assistant") &&
+          !m.meta?.thinking &&
+          !m.meta?.isError,
+      )
       .map((m) => ({ role: m.role, content: m.content }))
-      .filter((m) => typeof m.content === "string" && m.content.trim().length > 0);
+      .filter(
+        (m) => typeof m.content === "string" && m.content.trim().length > 0,
+      );
     return msgs.slice(-10);
   };
 
@@ -233,7 +266,7 @@ export default function App() {
         if (c.id !== chatId) return c;
         const messages = [...c.messages, message];
         return { ...c, messages, title: deriveTitle(messages) };
-      })
+      }),
     );
   };
 
@@ -241,9 +274,11 @@ export default function App() {
     setChats((prev) =>
       prev.map((c) => {
         if (c.id !== chatId) return c;
-        const messages = c.messages.map((m) => (m.id === messageId ? nextMessage : m));
+        const messages = c.messages.map((m) =>
+          m.id === messageId ? nextMessage : m,
+        );
         return { ...c, messages, title: deriveTitle(messages) };
-      })
+      }),
     );
   };
 
@@ -257,7 +292,7 @@ export default function App() {
           return { ...m, meta: nextMeta };
         });
         return { ...c, messages };
-      })
+      }),
     );
   };
 
@@ -271,7 +306,6 @@ export default function App() {
     setChats((prev) => [next, ...prev]);
     setActiveChatId(next.id);
     setSidebarOpen(false);
-    setError("");
     setComposer("");
   };
 
@@ -283,7 +317,6 @@ export default function App() {
     if (s?.length) setLength(s.length);
     if (s?.tone) setTone(s.tone);
     setSidebarOpen(false);
-    setError("");
   };
 
   const handleDeleteChat = (id) => {
@@ -320,14 +353,22 @@ export default function App() {
   const handleLike = (messageId) => {
     updateMessageMeta(activeChat.id, messageId, (meta) => {
       const nextLiked = !meta.liked;
-      return { ...meta, liked: nextLiked, disliked: nextLiked ? false : meta.disliked };
+      return {
+        ...meta,
+        liked: nextLiked,
+        disliked: nextLiked ? false : meta.disliked,
+      };
     });
   };
 
   const handleDislike = (messageId) => {
     updateMessageMeta(activeChat.id, messageId, (meta) => {
       const nextDisliked = !meta.disliked;
-      return { ...meta, disliked: nextDisliked, liked: nextDisliked ? false : meta.liked };
+      return {
+        ...meta,
+        disliked: nextDisliked,
+        liked: nextDisliked ? false : meta.liked,
+      };
     });
   };
 
@@ -362,7 +403,8 @@ export default function App() {
     const voices = synth.getVoices?.() || [];
     if (!voices.length) return null;
 
-    const isEnglish = (v) => /en(-|_)?/i.test(v.lang || "") || /english/i.test(v.name || "");
+    const isEnglish = (v) =>
+      /en(-|_)?/i.test(v.lang || "") || /english/i.test(v.name || "");
     const english = voices.filter(isEnglish);
     const pool = english.length ? english : voices;
 
@@ -371,14 +413,26 @@ export default function App() {
 
     if (voicePref === "feminine") {
       return (
-        pool.find((v) => has(v, ["female", "zira", "susan", "amy", "emma", "samantha", "victoria"])) ||
+        pool.find((v) =>
+          has(v, [
+            "female",
+            "zira",
+            "susan",
+            "amy",
+            "emma",
+            "samantha",
+            "victoria",
+          ]),
+        ) ||
         pool.find((v) => v.default) ||
         pool[0]
       );
     }
     if (voicePref === "masculine") {
       return (
-        pool.find((v) => has(v, ["male", "david", "mark", "guy", "daniel", "alex", "james"])) ||
+        pool.find((v) =>
+          has(v, ["male", "david", "mark", "guy", "daniel", "alex", "james"]),
+        ) ||
         pool.find((v) => v.default) ||
         pool[0]
       );
@@ -419,13 +473,23 @@ export default function App() {
     const history = buildHistory();
 
     setComposer("");
-    setError("");
     setLoading(true);
 
-    appendMessage(chatId, { id: uid(), role: "user", content: text, ts: Date.now() });
+    appendMessage(chatId, {
+      id: uid(),
+      role: "user",
+      content: text,
+      ts: Date.now(),
+    });
 
     const thinkingId = uid();
-    appendMessage(chatId, { id: thinkingId, role: "assistant", content: "", ts: Date.now(), meta: { thinking: true } });
+    appendMessage(chatId, {
+      id: thinkingId,
+      role: "assistant",
+      content: "",
+      ts: Date.now(),
+      meta: { thinking: true },
+    });
 
     try {
       const payloadForStorage = buildPayload(text);
@@ -437,33 +501,54 @@ export default function App() {
         role: "assistant",
         content: data.output || "",
         ts: Date.now(),
-        meta: { latency: data.latency ?? null, model: data.model, settings: data.settings },
+        meta: {
+          latency: data.latency ?? null,
+          model: data.model,
+          settings: data.settings,
+        },
         lastPayload: payloadForStorage,
       });
     } catch (err) {
-      const msg = err.response?.data?.error || "Failed to generate. Please try again.";
-      setError(msg);
-      replaceMessage(chatId, thinkingId, { id: uid(), role: "assistant", content: `Error: ${msg}`, ts: Date.now(), meta: { isError: true } });
+      toast.error("Couldn't generate that. Try again?");
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== chatId) return c;
+          return {
+            ...c,
+            messages: c.messages.filter((m) => m.id !== thinkingId),
+          };
+        }),
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const canRegenerate = useMemo(() => !!activeChat?.messages?.some((m) => m.lastPayload) && !loading, [activeChat?.messages, loading]);
+  const canRegenerate = useMemo(
+    () => !!activeChat?.messages?.some((m) => m.lastPayload) && !loading,
+    [activeChat?.messages, loading],
+  );
 
   const handleRegenerate = async () => {
     if (!canRegenerate) return;
 
     const chatId = activeChat.id;
-    const lastAssistant = [...activeChat.messages].reverse().find((m) => m.lastPayload);
+    const lastAssistant = [...activeChat.messages]
+      .reverse()
+      .find((m) => m.lastPayload);
     const payload = lastAssistant?.lastPayload;
     if (!payload) return;
 
-    setError("");
     setLoading(true);
 
     const thinkingId = uid();
-    appendMessage(chatId, { id: thinkingId, role: "assistant", content: "", ts: Date.now(), meta: { thinking: true } });
+    appendMessage(chatId, {
+      id: thinkingId,
+      role: "assistant",
+      content: "",
+      ts: Date.now(),
+      meta: { thinking: true },
+    });
 
     try {
       const data = await callGenerate({ ...payload, history: buildHistory() });
@@ -472,13 +557,24 @@ export default function App() {
         role: "assistant",
         content: data.output || "",
         ts: Date.now(),
-        meta: { latency: data.latency ?? null, model: data.model, settings: data.settings },
+        meta: {
+          latency: data.latency ?? null,
+          model: data.model,
+          settings: data.settings,
+        },
         lastPayload: payload,
       });
     } catch (err) {
-      const msg = err.response?.data?.error || "Failed to regenerate. Please try again.";
-      setError(msg);
-      replaceMessage(chatId, thinkingId, { id: uid(), role: "assistant", content: `Error: ${msg}`, ts: Date.now(), meta: { isError: true } });
+      toast.error("Couldn't regenerate. Try again?");
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== chatId) return c;
+          return {
+            ...c,
+            messages: c.messages.filter((m) => m.id !== thinkingId),
+          };
+        }),
+      );
     } finally {
       setLoading(false);
     }
@@ -487,8 +583,11 @@ export default function App() {
   const shownSettings = activeChat?.settings || { mode, length, tone };
 
   return (
-    <div className="h-screen overflow-hidden" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="relative flex h-screen w-full min-h-0 overflow-hidden">
+    <div
+      className="h-dvh-safe overflow-hidden"
+      style={{ background: "var(--bg)", color: "var(--text)" }}
+    >
+      <div className="relative flex h-dvh-safe w-full min-h-0 overflow-hidden">
         <Sidebar
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
@@ -511,32 +610,47 @@ export default function App() {
           setVoicePref={setVoicePref}
         />
 
-        <section className="flex min-h-0 flex-1 flex-col">
-          <header className="flex items-center justify-between gap-3 px-4 py-3 md:px-6" style={{ borderBottom: "1px solid var(--border)" }}>
-            <div className="flex items-center gap-3">
+        <section className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+          <header
+            className="flex items-center justify-between gap-2 px-3 py-3 sm:px-4 md:px-6"
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="grid h-9 w-9 place-items-center rounded-xl text-xs md:hidden"
-                style={{ border: "1px solid var(--border)", background: "var(--panel)" }}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-xs md:hidden"
+                style={{
+                  border: "1px solid var(--border)",
+                  background: "var(--panel)",
+                }}
                 aria-label="Open sidebar"
                 title="Menu"
               >
                 <PanelLeft size={18} strokeWidth={2.5} />
               </button>
-              <div>
-                <div className="text-sm font-medium" style={{ color: "var(--text)" }}>{activeChat?.title || "DINOVA"}</div>
-                <div className="text-xs dinova-muted">
+              <div className="min-w-0">
+                <div
+                  className="truncate text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  {activeChat?.title || "DINOVA"}
+                </div>
+                <div className="truncate text-xs dinova-muted">
                   Tool: {shownSettings.mode} | Length: {shownSettings.length}
-                  {shownSettings.mode === "email" ? ` | Tone: ${shownSettings.tone}` : ""}
+                  {shownSettings.mode === "email"
+                    ? ` | Tone: ${shownSettings.tone}`
+                    : ""}
                 </div>
               </div>
             </div>
-            <div className="text-xs dinova-muted">No login required</div>
+            <div className="hidden shrink-0 text-xs dinova-muted sm:block">No login required</div>
           </header>
 
           {storageWarning ? (
-            <div className="px-4 pt-3 text-xs dinova-muted">{storageWarning}</div>
+            <div className="px-4 pt-3 text-xs dinova-muted">
+              {storageWarning}
+            </div>
           ) : null}
 
           <MessageList
@@ -549,9 +663,17 @@ export default function App() {
             speakingMessageId={speakingMessageId}
           />
 
-          <div>
-            {error ? (<div className="px-4 pt-3 text-sm" style={{ color: "#ef4444" }}>{error}</div>) : null}
-            <ChatInput value={composer} onChange={setComposer} onSend={handleSend} disabled={!canSend} />
+          <div className="shrink-0">
+            <ChatInput
+              value={composer}
+              onChange={setComposer}
+              onSend={handleSend}
+              disabled={!canSend}
+              length={length}
+              setLength={setLength}
+              themePref={themePref}
+              setThemePref={setThemePref}
+            />
           </div>
         </section>
       </div>
