@@ -5,25 +5,26 @@ import Groq from "groq-sdk";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
+const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || "").trim().replace(/\/+$/, "");
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 app.use(express.json({ limit: "2mb" }));
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true; // allow curl/postman
-  if (process.env.NODE_ENV === "production") {
-    return ALLOWED_ORIGIN ? origin === ALLOWED_ORIGIN : false;
-  }
-  if (origin.includes("localhost")) return true;
-  if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) return true;
+  const clean = origin.trim().replace(/\/+$/, "");
+  if (clean.includes("localhost")) return true;
+  if (ALLOWED_ORIGIN && clean === ALLOWED_ORIGIN) return true;
   return false;
 };
+
+console.log("CORS allowed origin:", ALLOWED_ORIGIN || "(none set)");
 
 app.use(
   cors({
     origin: (origin, callback) => {
       if (isAllowedOrigin(origin)) return callback(null, true);
+      console.warn("CORS blocked:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
   }),
